@@ -27,4 +27,4 @@ This project is built with a small team of AI agents (a designer, an engineer an
 Gym locations are seeded from OpenStreetMap data. © OpenStreetMap contributors.
 
 ## Author
-Built by Bekah. Questions, corrections and gym submissions are welcome.
+Built by Rebekah. Questions, corrections and gym submissions are welcome.
