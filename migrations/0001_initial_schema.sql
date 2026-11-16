@@ -37,14 +37,14 @@ CREATE INDEX idx_gym_lat_lng ON gym (lat, lng);
 -- ---------------------------------------------------------------------------
 -- open_mat
 -- A recurring open mat session at a gym.
--- day_of_week: 0 = Sunday, 6 = Saturday (ISO-like; document in app layer).
+-- day_of_week: 1 = Monday, 7 = Sunday (ISO 8601).
 -- fee_cents  : NULL = unknown cost; 0 = free; positive integer = drop-in fee.
 -- verified_by: 'owner' | 'visitor' | 'agent_check'
 -- ---------------------------------------------------------------------------
 CREATE TABLE open_mat (
     id               BIGSERIAL PRIMARY KEY,
-    gym_id           BIGINT REFERENCES gym (id),
-    day_of_week      SMALLINT CHECK (day_of_week BETWEEN 0 AND 6),
+    gym_id           BIGINT NOT NULL REFERENCES gym (id),
+    day_of_week      SMALLINT CHECK (day_of_week BETWEEN 1 AND 7),
     start_time       TIME NOT NULL,
     end_time         TIME,
     format           TEXT CHECK (format IN ('gi', 'nogi', 'both')),

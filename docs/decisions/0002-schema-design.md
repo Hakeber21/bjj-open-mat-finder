@@ -22,7 +22,8 @@ Three tables: `gym`, `open_mat`, and `submission`. Details below.
   silently; `CHECK` makes the database the last line of defense.
 - `open_mat` links to `gym` and stores one row per recurring session. `format`,
   `verified_by`, and `day_of_week` are all constrained to their documented allowed
-  values.
+  values. `gym_id` is `NOT NULL` because every open mat must belong to a gym.
+  `day_of_week` follows ISO 8601 (1 = Monday, 7 = Sunday).
 - `submission` stores the raw form payload as JSONB so the form shape can change
   without a migration. Rows sit in the moderation queue until a human sets
   `status = 'approved'` or `'rejected'`.
