@@ -33,8 +33,18 @@ def _get_database_url() -> str:
 async def create_pool() -> AsyncConnectionPool:
     """Open the connection pool.  Call once at application startup."""
     url = _get_database_url()
-    # min_size=1 keeps one warm connection; max_size=5 is generous for a
-    # free-tier DB that limits concurrent connections.
-    pool = AsyncConnectionPool(conninfo=url, min_size=1, max_size=5, open=False)
+    # min_size = the number of connections the pool keeps open even when idle.
+    # We set it to 0 because Neon is "serverless": it auto-suspends the database
+    # when nothing is querying it, and on suspend it drops any open connection.
+    # So holding a warm connection (min_size=1) buys little here, and a held
+    # connection can quietly go stale after a suspend -- the next request would
+    # then hit a dead connection and error once before reconnecting.
+    # With min_size=0 the pool holds nothing while idle and opens a fresh
+    # connection on the first request after a quiet spell (a small one-time
+    # "cold start"), so it never hands out a dead connection.
+    # max_size=5 is the ceiling: at most 5 connections at once, which is kind to
+    # the free tier's connection limit. Steady traffic still reuses warm
+    # connections normally; only the first request after an idle gap pays extra.
+    pool = AsyncConnectionPool(conninfo=url, min_size=0, max_size=5, open=False)
     await pool.open()
     return pool
