@@ -35,7 +35,6 @@ VALUES
   ('Lions Krav Maga', NULL, 'Austin', 'US', 30.3622437, -97.7422071, 'https://lionskravmaga.com/', NULL, 'osm', NULL),
   ('Nunan''s Martial Arts', '2051 Cypress Creek Road', 'Cedar Park', 'US', 30.4762764, -97.8413442, 'https://www.nunansmartialarts.com/', NULL, 'osm', NULL),
   ('The Mat Martial Arts', '2100 Cypress Creek Road', 'Cedar Park', 'US', 30.4744925, -97.841417, 'https://themataustin.com/', NULL, 'osm', NULL),
-  ('Jiu Jitsu', NULL, 'Austin', 'US', 30.4545492, -97.7927074, NULL, NULL, 'osm', NULL),
   ('Paragon Jiu-Jitsu Academy Austin', '6800 West Gate Boulevard', 'Austin', 'US', 30.2093036, -97.8156715, 'https://www.paragonaustin.com', NULL, 'osm', NULL),
   ('Gracie Barra Brazilian Jiu Jitsu', NULL, 'Austin', 'US', 30.3690507, -97.7206547, NULL, NULL, 'osm', NULL),
   ('Premier Martial Arts Pflugerville', '1420 Wells Branch Parkway', 'Pflugerville', 'US', 30.4419585, -97.6628492, 'https://premiermartialarts.com', NULL, 'osm', NULL)
