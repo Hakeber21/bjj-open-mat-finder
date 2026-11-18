@@ -1,0 +1,49 @@
+name: Deploy to WEB02
+
+# Deploys the API to WEB02 on every push to main.
+# Requires four repo secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST           web02.sitedriveinc.com
+#   DEPLOY_USER           openmat
+#   DEPLOY_SSH_KEY        private half of the openmat deploy key
+#   DATABASE_URL_UNPOOLED Neon *unpooled* connection string (direct, no -pooler)
+#
+# The app (api/db.py) requires the UNPOOLED URL: psycopg3 runs its own pool,
+# so going through Neon's PgBouncer pooler breaks prepared statements.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web02
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DBURL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: DBURL
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/openmat/app
+            git fetch --quiet origin main
+            git reset --hard origin/main
+            /opt/openmat/venv/bin/pip install -q -r requirements.txt
+            # Write the env file from the secret (0600 via umask), then restart.
+            umask 077
+            printf "DATABASE_URL_UNPOOLED='%s'\n" "$DBURL" > /opt/openmat/openmat.env
+            sudo -n /usr/bin/systemctl restart openmat
+            sleep 3
+            systemctl is-active openmat
+            curl -fsS http://127.0.0.1:8000/health
