@@ -17,10 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.db import create_pool
 from api.routers import gyms, search
 
-# Load .env if present (no-op if the file does not exist).
-# This runs at import time so DATABASE_URL is in os.environ before the
-# lifespan tries to open the pool.
+# Load env files. .env.local (Neon-generated) takes precedence over .env.
+# Both are gitignored; .env.example is the committed template.
 load_dotenv()
+load_dotenv(".env.local", override=True)
 
 
 # ---------------------------------------------------------------------------

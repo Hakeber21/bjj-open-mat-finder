@@ -5,13 +5,13 @@ The pool is opened once at startup (via FastAPI's lifespan) and stored on
 app.state so every request can borrow a connection without paying the
 connect overhead.
 
-DATABASE_URL is read from the environment.  If a .env file is present,
-python-dotenv loads it before this module is imported (see main.py).
+Neon provides two URLs:
+  DATABASE_URL_UNPOOLED  — direct connection; use this with psycopg3's own
+                           pool to avoid double-pooling with Neon's PgBouncer.
+  DATABASE_URL           — Neon's PgBouncer pooler; preferred for serverless
+                           runtimes that cannot hold open connections.
 
-psycopg3 connection string format:
-    postgresql+psycopg://user:password@host:5432/dbname
-The "postgresql+psycopg" scheme is recognised by psycopg3; plain
-"postgresql" also works.
+We use the unpooled URL here and let psycopg3 manage the pool.
 """
 
 import os
@@ -20,11 +20,12 @@ from psycopg_pool import AsyncConnectionPool
 
 
 def _get_database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
+    # Prefer the unpooled URL to avoid double-pooling with Neon's PgBouncer.
+    url = os.environ.get("DATABASE_URL_UNPOOLED") or os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError(
-            "DATABASE_URL environment variable is not set. "
-            "Copy .env.example to .env and fill it in."
+            "DATABASE_URL_UNPOOLED (or DATABASE_URL) is not set. "
+            "Run `neon deploy` to populate .env.local, or copy .env.example to .env."
         )
     return url
 
