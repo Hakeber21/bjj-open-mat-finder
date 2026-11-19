@@ -154,28 +154,75 @@ database password is readable only by that user.
 
 ---
 
-## 6. Reading the live server logs
+## 6. Reading the live server logs yourself
 
-The real-time application logs (including full error tracebacks) live in the
-server's journal: `journalctl -u openmat`. Reading them needs access to the
-server.
+The real-time application logs — every request and full error traceback — live
+on the server. You can get your **own read-only access** to them: a login that
+does exactly one thing, show this app's live logs, and nothing else (no shell,
+no other sites, no database password). It's safe by design.
 
-**Right now, the way to get logs is to ask Dan** — he can pull them in seconds.
-Paste the failing request (URL + roughly when it happened) and he can find the
-matching error.
+Setting it up is a one-time, three-step process.
 
-### Can you get your own log access?
-Maybe — but **not** by logging in as the app's own user, because that user can
-read the database password. If direct log access becomes worth it, the safe
-setup (which Dan would configure) is:
+### Step 1 — Create an SSH key (or reuse one you have)
 
-- a **separate, read-only login** for you, with **no shell and no admin
-  rights**, whose only ability is to **tail the openmat log** — nothing else on
-  the server, and no access to the database password or other sites.
+An SSH key is a pair of files: a **private** key (stays secret on your computer —
+*never* share it) and a **public** key (safe to share — it's what lets the server
+recognize you).
 
-That keeps you to "just this one app's logs," which is the goal. It's a small
-amount of setup, so it's worth doing only if you find yourself needing logs
-often. For now, pinging Dan is the path.
+If you already have one — for example the key you use with GitHub, usually at
+`~/.ssh/id_ed25519.pub` — you can skip to Step 2 and use that.
+
+Otherwise, generate one. On **macOS/Linux** open Terminal, or on **Windows** open
+PowerShell, and run:
+
+```bash
+ssh-keygen -t ed25519 -C "openmat logs"
+```
+
+Press Enter to accept the default location. A passphrase is optional (press Enter
+twice to skip it). This creates two files in your `.ssh` folder:
+
+- `id_ed25519`      ← your **private** key — keep secret, never send it
+- `id_ed25519.pub`  ← your **public** key — this is the one you share
+
+### Step 2 — Send Dan your **public** key
+
+Print the public key and copy the whole line it outputs:
+
+```bash
+cat ~/.ssh/id_ed25519.pub                      # macOS / Linux
+# Windows PowerShell:
+type $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+It looks like `ssh-ed25519 AAAAC3Nza... openmat logs`. Send **that entire line**
+to Dan (Slack or email is fine — a public key is not a secret). He installs it
+and tells you when it's ready.
+
+> ⚠️ **Only ever send the `.pub` one.** If a file's contents start with
+> `-----BEGIN OPENSSH PRIVATE KEY-----`, that's your **private** key — never send
+> that to anyone, ever.
+
+### Step 3 — Connect and watch the logs
+
+Once Dan confirms your key is installed, run:
+
+```bash
+ssh bekah@web02.sitedriveinc.com
+```
+
+You'll immediately see the most recent log lines, then new ones stream in live as
+the app handles requests. Press **Ctrl-C** (or close the window) to stop.
+
+This login drops you straight into the log view — it is **not** a shell. You
+can't run other commands, reach other sites, or see the database password. That's
+intentional: it's scoped to just this app's logs.
+
+### Reading what you see
+- A normal request: `INFO: ... "GET /api/search?... " 200 OK`
+- An error: a `500` followed by a **Traceback** — the *last* line names the real
+  error (e.g. the Neon `AdminShutdown` from the cold-start note in Section 4).
+- Stuck? Copy the traceback and send it to Dan.
 
 ---
 
@@ -204,6 +251,8 @@ touch the schema.
 
 - **Deploy failed (red in Actions):** read the failing step first; most are a
   typo or a missing dependency you can fix and re-push.
-- **App is down / 500s that don't recover on retry / need the logs:** ping Dan.
+- **A 500 or odd behavior:** check the live logs yourself (Section 6) — the
+  traceback usually names the cause. If it's not clear, send the traceback to Dan.
+- **App is fully down (even `/health` fails):** ping Dan.
 - **Database (Neon) questions:** that's yours to manage, but Dan can help think
   it through.
