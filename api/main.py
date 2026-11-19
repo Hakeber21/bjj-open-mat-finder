@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import create_pool
-from api.routers import gyms, search
+from api.routers import gyms, search, submissions
 
 # Load env files. .env.local (Neon-generated) takes precedence over .env.
 # Both are gitignored; .env.example is the committed template.
@@ -68,6 +68,7 @@ app.add_middleware(
 
 app.include_router(search.router, prefix="/api")
 app.include_router(gyms.router, prefix="/api")
+app.include_router(submissions.router, prefix="/api")
 
 
 @app.get("/health", tags=["ops"])
