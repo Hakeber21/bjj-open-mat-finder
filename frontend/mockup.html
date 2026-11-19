@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Mat Finder — Austin, TX</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    /* ============================================================
+       DESIGN TOKENS — BJJ Belt Color System
+       Progression: White → Blue → Purple → Brown → Black
+       Primary accent: Purple (#6B2D8B)
+       Secondary accent: Blue (#1E4D8C)
+       Header/hero gradient: purple → blue (belt rank progression)
+       ============================================================ */
+    :root {
+      --belt-white:  #F5F5F0;
+      --belt-blue:   #1E4D8C;
+      --belt-purple: #6B2D8B;
+      --belt-brown:  #5C3317;
+      --belt-black:  #0F0F0F;
+
+      --color-bg:         #0F0F0F;
+      --color-surface:    #1a1210;
+      --color-surface-2:  #231916;
+      --color-border:     #2a1f1a;
+      --color-text:       #F0EDE8;
+      --color-text-muted: #8a7a74;
+
+      --color-accent:        #6B2D8B;
+      --color-accent-dim:    #3d1a50;
+      --color-secondary:     #1E4D8C;
+      --color-secondary-dim: #0d2547;
+
+      /* Freshness signal — belt-adjacent palette */
+      --color-fresh:        #5B9BD5;
+      --color-fresh-bg:     #0a1e35;
+      --color-fresh-border: #1a3d6b;
+      --color-warn:         #C4832A;
+      --color-warn-bg:      #2a1a07;
+      --color-warn-border:  #6b4015;
+      --color-stale:        #7A6060;
+      --color-stale-bg:     #1e1515;
+      --color-stale-border: #3a2525;
+
+      /* Format badges */
+      --color-gi:          #5B9BD5;
+      --color-gi-bg:       #0a1e35;
+      --color-gi-border:   #1a3d6b;
+      --color-nogi:        #9B59B6;
+      --color-nogi-bg:     #2a1040;
+      --color-nogi-border: #5a2a7a;
+      --color-both:        #4A90D9;
+      --color-both-bg:     #0a1825;
+      --color-both-border: #1a4a80;
+
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  16px;
+      --shadow:     0 2px 12px rgba(0,0,0,0.6);
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* ============================================================
+       RESET & BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.5;
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: inherit;
+    }
+    a { color: var(--color-secondary); text-decoration: none; }
+    a:hover { text-decoration: underline; color: var(--color-fresh); }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* ---- HEADER — belt gradient + subtle triangle watermark ---- */
+    .header {
+      flex-shrink: 0;
+      /* Triangle watermark tessellated over belt-progression gradient */
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26'%3E%3Cpolygon points='15,2 28,24 2,24' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3C/svg%3E"),
+        -webkit-linear-gradient(90deg, hsla(220,55%,68%,1) 0%, hsla(228,92%,47%,1) 14%, hsla(272,94%,49%,1) 35%, hsla(27,53%,25%,1) 58%, hsla(20,79%,7%,1) 81%);
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26'%3E%3Cpolygon points='15,2 28,24 2,24' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3C/svg%3E"),
+        linear-gradient(90deg, hsla(220,55%,68%,1) 0%, hsla(228,92%,47%,1) 14%, hsla(272,94%,49%,1) 35%, hsla(27,53%,25%,1) 58%, hsla(20,79%,7%,1) 81%);
+      background-size: 30px 26px, cover;
+      padding: 10px 12px 8px;
+      z-index: 400;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+      color: rgba(255,255,255,0.95);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.45);
+    }
+    .logo span { font-weight: 800; color: #fff; }
+
+    /* Search input row */
+    .search-row {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      flex: 1;
+    }
+    .search-input-wrap svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 10px 10px 34px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-sm);
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      min-height: 44px;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,0.55); }
+    .search-input:focus { border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.18); }
+
+    .btn-near-me {
+      padding: 0 12px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,0.9);
+      font-size: 13px;
+      white-space: nowrap;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-near-me:hover { background: rgba(255,255,255,0.2); }
+
+    /* ---- DAY FILTER CHIPS (Mon–Sun, multi-select) ---- */
+    .day-filter {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      margin-bottom: 8px;
+    }
+    .day-filter::-webkit-scrollbar { display: none; }
+
+    .day-chip {
+      flex: 0 0 auto;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      min-height: 34px;
+      color: rgba(255,255,255,0.65);
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .day-chip.active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+      box-shadow: 0 0 0 1px rgba(107,45,139,0.4);
+    }
+    .day-chip:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .day-chip.active:hover { background: #7d35a3; }
+
+    /* ---- OTHER FILTER CHIPS ---- */
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 2px;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      font-size: 13px;
+      white-space: nowrap;
+      min-height: 36px;
+      color: rgba(255,255,255,0.65);
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .filter-chip.active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
+    .filter-chip:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+    /* ---- MAIN BODY ---- */
+    .main-body {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ---- MAP PANEL ---- */
+    #map {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* ---- BOTTOM SHEET — transform-based snapping ----
+       height: 100% fills the main-body; translateY controls what's visible.
+       Snap states: peek (80px), half (45%), full (92%)
+       Desktop override resets to static layout (see @media below).
+    ---- */
+    .bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      will-change: transform;
+      /* initial state set by JS: snapToState("half", false) */
+    }
+
+    .sheet-handle {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0 6px;
+      cursor: grab;
+      touch-action: none;
+    }
+    .sheet-handle:active { cursor: grabbing; }
+    .sheet-handle-bar {
+      width: 40px;
+      height: 4px;
+      background: var(--color-border);
+      border-radius: 2px;
+    }
+
+    .sheet-header {
+      flex-shrink: 0;
+      padding: 0 16px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sheet-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+    .sheet-count {
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .gym-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 12px 80px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border) transparent;
+    }
+
+    /* ---- GYM CARD ---- */
+    .gym-card {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .gym-card:hover, .gym-card:focus-within { border-color: var(--color-accent); outline: none; }
+    .gym-card:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .gym-name {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    /* Freshness badge — the product's trust differentiator */
+    .freshness-badge {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+    }
+    .freshness-badge.fresh {
+      background: var(--color-fresh-bg);
+      color: var(--color-fresh);
+      border: 1px solid var(--color-fresh-border);
+    }
+    .freshness-badge.warn {
+      background: var(--color-warn-bg);
+      color: var(--color-warn);
+      border: 1px solid var(--color-warn-border);
+    }
+    .freshness-badge.stale {
+      background: var(--color-stale-bg);
+      color: var(--color-stale);
+      border: 1px solid var(--color-stale-border);
+    }
+
+    .freshness-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    .fresh  .freshness-dot { background: var(--color-fresh); }
+    .warn   .freshness-dot { background: var(--color-warn); }
+    .stale  .freshness-dot { background: var(--color-stale); }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* Format badge — ▲ prefix added via ::before (geometric nod to BJJ triangle) */
+    .format-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .format-badge::before {
+      content: "▲ ";
+      font-size: 7px;
+      vertical-align: middle;
+      opacity: 0.75;
+    }
+    .format-badge.gi   { background: var(--color-gi-bg);   color: var(--color-gi);   border: 1px solid var(--color-gi-border); }
+    .format-badge.nogi { background: var(--color-nogi-bg); color: var(--color-nogi); border: 1px solid var(--color-nogi-border); }
+    .format-badge.both { background: var(--color-both-bg); color: var(--color-both); border: 1px solid var(--color-both-border); }
+
+    .card-time { font-size: 14px; font-weight: 600; color: var(--color-text); }
+    .card-day  { font-size: 13px; color: var(--color-text-muted); }
+    .card-fee  { font-size: 13px; font-weight: 600; color: var(--color-text-muted); }
+    .card-fee.free { color: var(--color-fresh); }
+
+    .card-policy {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .policy-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .policy-welcome .policy-dot { background: var(--color-fresh); }
+    .policy-call    .policy-dot { background: var(--color-warn); }
+    .policy-members .policy-dot { background: var(--color-stale); }
+    .policy-unknown .policy-dot { background: var(--color-text-muted); }
+
+    .card-footer {
+      border-top: 1px solid var(--color-border);
+      margin-top: 10px;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-verified-line { font-size: 11px; color: var(--color-text-muted); }
+    .btn-see-details {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-secondary);
+      padding: 4px 0;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+    }
+    .btn-see-details:hover { color: var(--color-accent); }
+
+    /* ---- FAB — Submit a gym ---- */
+    .fab {
+      position: absolute;
+      bottom: 24px;
+      right: 16px;
+      z-index: 300;
+      background: -webkit-linear-gradient(90deg, hsla(185,56%,53%,1) 0%, hsla(270,50%,40%,1) 100%);
+      background: linear-gradient(90deg, hsla(185,56%,53%,1) 0%, hsla(270,50%,40%,1) 100%);
+      color: #fff;
+      border-radius: 28px;
+      padding: 0 20px;
+      height: 52px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(107,45,139,0.5);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .fab:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(107,45,139,0.65); }
+    .fab:active { transform: translateY(0); }
+
+    /* ============================================================
+       DETAIL DRAWER
+       ============================================================ */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .detail-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .detail-drawer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 600;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      height: fit-content;
+      max-height: 94vh;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .detail-drawer.open { transform: translateY(0); }
+
+    .drawer-handle {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      padding: 10px 0 6px;
+      z-index: 2;
+    }
+    .drawer-handle-bar {
+      width: 40px; height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+    }
+
+    /* Gradient hero at top of detail drawer — triangle choke clip-path at bottom */
+    .drawer-hero {
+      flex-shrink: 0;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26'%3E%3Cpolygon points='15,2 28,24 2,24' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3C/svg%3E"),
+        linear-gradient(90deg, #F5F5F0 0%, #1E4D8C 25%, #6B2D8B 50%, #5C3317 75%, #0F0F0F 100%);
+      background-size: 30px 26px, cover;
+      padding: 32px 16px 44px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      /* Diagonal cut at bottom — nod to the triangle choke */
+      clip-path: polygon(0 0, 100% 0, 100% 82%, 0 100%);
+      margin-bottom: -2px;
+    }
+    .drawer-hero-name {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.25;
+      color: #fff;
+      flex: 1;
+    }
+    .btn-close {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.85);
+      font-size: 16px;
+    }
+    .btn-close:hover { background: rgba(255,255,255,0.25); color: #fff; }
+
+    .drawer-body {
+      flex: 0 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px 16px 32px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border) transparent;
+    }
+
+    .drawer-section { margin-bottom: 20px; }
+    .drawer-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--color-text-muted);
+      margin-bottom: 10px;
+    }
+
+    .policy-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .policy-banner.welcome { background: var(--color-fresh-bg); color: var(--color-fresh); border: 1px solid var(--color-fresh-border); }
+    .policy-banner.call    { background: var(--color-warn-bg);  color: var(--color-warn);  border: 1px solid var(--color-warn-border); }
+    .policy-banner.members { background: var(--color-stale-bg); color: var(--color-stale); border: 1px solid var(--color-stale-border); }
+
+    .schedule-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .schedule-row:last-child { border-bottom: none; }
+    .schedule-day {
+      width: 36px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+    }
+    .schedule-time { font-size: 15px; font-weight: 600; flex: 1; }
+    .schedule-note { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+    .schedule-fee { font-size: 13px; font-weight: 600; color: var(--color-text-muted); flex-shrink: 0; }
+    .schedule-fee.free { color: var(--color-fresh); }
+
+    .contact-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--color-text);
+      min-height: 44px;
+      transition: border-color 0.15s;
+    }
+    .contact-link:hover { border-color: var(--color-secondary); text-decoration: none; color: var(--color-fresh); }
+
+    .drawer-freshness {
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .drawer-freshness.fresh { background: var(--color-fresh-bg); color: var(--color-fresh); border: 1px solid var(--color-fresh-border); }
+    .drawer-freshness.warn  { background: var(--color-warn-bg);  color: var(--color-warn);  border: 1px solid var(--color-warn-border); }
+    .drawer-freshness.stale { background: var(--color-stale-bg); color: var(--color-stale); border: 1px solid var(--color-stale-border); }
+
+    .btn-report {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--color-text-muted);
+      min-height: 44px;
+      cursor: pointer;
+    }
+    .btn-report:hover { border-color: var(--color-warn); color: var(--color-warn); }
+
+    /* ============================================================
+       SUBMIT / REPORT MODAL
+       ============================================================ */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 700;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .modal {
+      width: 100%;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      border-top: 1px solid var(--color-border);
+      padding: 20px 16px 32px;
+      max-height: 94vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .modal-subtitle {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin-bottom: 20px;
+    }
+
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      margin-bottom: 5px;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      min-height: 44px;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--color-accent); }
+    .form-select option { background: var(--color-surface); }
+
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(90deg, #F5F5F0 0%, #1E4D8C 25%, #6B2D8B 50%, #5C3317 75%, #0F0F0F 100%);
+      color: #fff;
+      border-radius: var(--radius-sm);
+      font-size: 16px;
+      font-weight: 700;
+      min-height: 52px;
+      margin-top: 8px;
+      transition: opacity 0.15s;
+    }
+    .btn-submit:hover { opacity: 0.9; }
+
+    .btn-cancel {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 14px;
+      min-height: 44px;
+      margin-top: 6px;
+    }
+    .btn-cancel:hover { color: var(--color-text); }
+
+    /* ============================================================
+       EMPTY STATE — SVG triangle illustration
+       ============================================================ */
+    .empty-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      gap: 14px;
+    }
+    .empty-state.visible { display: flex; }
+    .empty-title { font-size: 17px; font-weight: 700; }
+    .empty-body {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      max-width: 280px;
+    }
+    .btn-clear-filters {
+      padding: 10px 20px;
+      background: var(--color-accent-dim);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      min-height: 44px;
+    }
+    .btn-clear-filters:hover { background: var(--color-accent); }
+
+    /* ============================================================
+       MAP POPUP OVERRIDES
+       ============================================================ */
+    .leaflet-popup-content-wrapper {
+      background: var(--color-surface) !important;
+      color: var(--color-text) !important;
+      border-radius: var(--radius-md) !important;
+      border: 1px solid var(--color-border) !important;
+      box-shadow: var(--shadow) !important;
+      padding: 0 !important;
+    }
+    .leaflet-popup-content { margin: 0 !important; width: auto !important; min-width: 200px; }
+    .leaflet-popup-tip { background: var(--color-surface) !important; }
+    .leaflet-popup-close-button { color: var(--color-text-muted) !important; font-size: 18px !important; top: 8px !important; right: 8px !important; }
+
+    .map-popup { padding: 14px 16px; }
+    .map-popup-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; padding-right: 20px; }
+    .map-popup-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: var(--color-text-muted);
+    }
+    .map-popup-row strong { color: var(--color-text); }
+    .map-popup-freshness { margin: 8px 0; }
+    .map-popup-link {
+      display: block;
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-secondary);
+      border-top: 1px solid var(--color-border);
+      padding-top: 8px;
+    }
+    .map-popup-link:hover { color: var(--color-accent); text-decoration: none; }
+
+    /* ============================================================
+       DESKTOP LAYOUT (min-width: 768px)
+       ============================================================ */
+    @media (min-width: 768px) {
+      .main-body { display: flex; flex-direction: row; }
+
+      /* Sidebar: override transform-based mobile layout */
+      .bottom-sheet {
+        position: static !important;
+        height: 100% !important;
+        transform: none !important;
+        transition: none !important;
+        width: 360px;
+        min-width: 300px;
+        max-width: 400px;
+        border-radius: 0;
+        border-top: none;
+        border-right: 1px solid var(--color-border);
+        flex-shrink: 0;
+      }
+      .sheet-handle { display: none; }
+      .gym-list { padding-bottom: 24px; }
+
+      #map { position: relative; flex: 1; }
+
+      .fab { position: fixed; bottom: 24px; right: 24px; }
+
+      .detail-drawer {
+        left: auto;
+        width: 400px;
+        max-width: 90vw;
+        bottom: 0; top: 0; right: 0;
+        border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+        border-top: none;
+        border-left: 1px solid var(--color-border);
+        height: auto;
+        max-height: 100vh;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      }
+      .detail-drawer.open { transform: translateX(0); }
+      .drawer-handle { display: none; }
+    }
+
+    /* OSM Attribution — always legible per license */
+    .leaflet-control-attribution {
+      background: rgba(26,18,16,0.88) !important;
+      color: var(--color-text-muted) !important;
+      font-size: 10px !important;
+    }
+    .leaflet-control-attribution a { color: var(--color-secondary) !important; }
+  </style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+<div class="app-shell">
+
+  <!-- ============================================================
+       HEADER — search + day chips + other filters
+       Engineer: search calls GET /api/gyms?city=...&days=...&format=...
+       ============================================================ -->
+  <header class="header" role="banner">
+    <div class="header-top">
+      <!-- Logo / wordmark -->
+      <div class="logo" aria-label="Open Mat Finder">
+        Open Mat <span>Finder</span>
+      </div>
+
+      <!-- Location search -->
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            class="search-input"
+            type="search"
+            placeholder="City or zip"
+            value="Austin, TX"
+            aria-label="Search by city or zip code"
+            id="location-search"
+          />
+        </div>
+        <button class="btn-near-me" aria-label="Use my current location" id="btn-near-me">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5"/>
+          </svg>
+          Near me
+        </button>
+      </div>
+    </div>
+
+    <!-- Day filter chips — Mon through Sun, multiple selectable -->
+    <div class="day-filter" role="group" aria-label="Filter by day of week" id="day-filter">
+      <button class="day-chip" data-day="0" id="chip-day-0" aria-pressed="false">Mon</button>
+      <button class="day-chip" data-day="1" id="chip-day-1" aria-pressed="false">Tue</button>
+      <button class="day-chip" data-day="2" id="chip-day-2" aria-pressed="false">Wed</button>
+      <button class="day-chip" data-day="3" id="chip-day-3" aria-pressed="false">Thu</button>
+      <button class="day-chip" data-day="4" id="chip-day-4" aria-pressed="false">Fri</button>
+      <button class="day-chip active" data-day="5" id="chip-day-5" aria-pressed="true">Sat</button>
+      <button class="day-chip" data-day="6" id="chip-day-6" aria-pressed="false">Sun</button>
+    </div>
+
+    <!-- Format / visitor / fee filters -->
+    <nav class="filter-bar" aria-label="Filter by format and policy">
+      <button class="filter-chip" aria-pressed="false" data-filter="format" data-value="gi"   id="chip-gi">Gi</button>
+      <button class="filter-chip" aria-pressed="false" data-filter="format" data-value="nogi" id="chip-nogi">No-Gi</button>
+      <button class="filter-chip" aria-pressed="false" data-filter="format" data-value="both" id="chip-both">Both</button>
+
+      <button class="filter-chip" aria-pressed="false" data-filter="fee" id="chip-free">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Free
+      </button>
+    </nav>
+  </header>
+
+  <!-- ============================================================
+       MAIN BODY — map behind, bottom sheet on top
+       ============================================================ -->
+  <main class="main-body" role="main">
+
+    <!-- MAP — Leaflet mounts here
+         Engineer: center Austin (30.2672, -97.7431), OSM tiles, no API key.
+         TODO: add Leaflet.markercluster when coverage grows beyond Austin.
+    -->
+    <div id="map" aria-label="Map of open mat gyms" role="region"></div>
+
+    <!-- BOTTOM SHEET / SIDEBAR -->
+    <section class="bottom-sheet" aria-label="Gym list" id="bottom-sheet" tabindex="-1">
+      <!-- Drag handle (mobile only) — touch-action:none set in CSS -->
+      <div class="sheet-handle" role="button" aria-label="Resize list panel" id="sheet-handle">
+        <div class="sheet-handle-bar"></div>
+      </div>
+
+      <div class="sheet-header">
+        <span class="sheet-title">Open mats</span>
+        <span class="sheet-count" id="result-count" aria-live="polite">5 results Saturday</span>
+      </div>
+
+      <!-- GYM LIST — rendered by renderGymList() -->
+      <div class="gym-list" id="gym-list" role="list">
+
+        <!-- EMPTY STATE — SVG triangle illustration -->
+        <div class="empty-state" id="empty-state" role="status" aria-label="No results">
+          <!-- Large triangle outline = BJJ triangle motif -->
+          <svg width="80" height="70" viewBox="0 0 80 70" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="40,4 76,66 4,66" stroke="#6B2D8B" stroke-width="2.5" stroke-linejoin="round"/>
+            <polygon points="40,20 62,58 18,58" stroke="#6B2D8B" stroke-width="1" opacity="0.35" stroke-linejoin="round"/>
+          </svg>
+          <div class="empty-title">No open mats found</div>
+          <div class="empty-body">Try a different day, remove a filter, or be the first to add one.</div>
+          <button class="btn-clear-filters" id="btn-clear-filters">Clear filters</button>
+        </div>
+
+        <!-- Cards injected by renderGymList() -->
+      </div>
+    </section>
+
+    <!-- FAB — Add a gym -->
+    <button class="fab" aria-label="Add a gym" id="btn-fab">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add a gym
+    </button>
+
+  </main>
+
+</div><!-- /app-shell -->
+
+<!-- ============================================================
+     DETAIL DRAWER
+     Engineer: on open, fetch GET /api/gyms/:id for full data.
+     ============================================================ -->
+<div class="detail-overlay" id="detail-overlay" aria-hidden="true"></div>
+<aside
+  class="detail-drawer"
+  id="detail-drawer"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Gym details"
+  aria-hidden="true"
+>
+  <!-- Drag pill (absolute, sits over hero) -->
+  <div class="drawer-handle">
+    <div class="drawer-handle-bar"></div>
+  </div>
+
+  <!-- Gradient hero — gym name on belt gradient with triangle-choke clip-path bottom -->
+  <div class="drawer-hero" id="drawer-hero">
+    <div class="drawer-hero-name" id="drawer-name">Gym name</div>
+    <button class="btn-close" id="btn-close-drawer" aria-label="Close details">&#10005;</button>
+  </div>
+
+  <!-- Body populated by showDetail(gymId) -->
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<!-- ============================================================
+     REPORT / SUBMIT MODAL
+     Engineer: POST /api/submissions — status defaults to 'pending'.
+     Used for both adding new gyms and reporting outdated info.
+     ============================================================ -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-label="Report or submit" aria-hidden="true">
+  <div class="modal" id="modal">
+    <div class="modal-title">Report / Submit</div>
+    <div class="modal-subtitle">
+      Add a new gym or report outdated info. Reviewed before going live — usually within 24–48 hrs.
+    </div>
+
+    <form id="submit-form" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="f-name">Gym name *</label>
+        <input class="form-input" type="text" id="f-name" name="name" required placeholder="e.g. Austin BJJ" autocomplete="organization" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="f-address">Address or neighborhood</label>
+        <input class="form-input" type="text" id="f-address" name="address" placeholder="e.g. 123 Congress Ave, Austin TX" autocomplete="street-address" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="f-day">Day *</label>
+          <select class="form-select" id="f-day" name="day" required>
+            <option value="">Select...</option>
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option selected>Saturday</option>
+            <option>Sunday</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="f-time">Start time *</label>
+          <input class="form-input" type="time" id="f-time" name="start_time" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="f-format">Format</label>
+          <select class="form-select" id="f-format" name="format">
+            <option value="">Unknown</option>
+            <option value="gi">Gi</option>
+            <option value="nogi">No-Gi</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="f-fee">Fee ($ or 0 = free)</label>
+          <input class="form-input" type="number" id="f-fee" name="fee" placeholder="e.g. 20" min="0" step="1" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="f-contact">Website or Instagram (optional)</label>
+        <input class="form-input" type="url" id="f-contact" name="contact" placeholder="https://" autocomplete="url" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="f-notes">Anything else? (belt req, notes, what's outdated)</label>
+        <input class="form-input" type="text" id="f-notes" name="notes" placeholder="e.g. All levels welcome, bring a rash guard" />
+      </div>
+
+      <button type="submit" class="btn-submit">Submit for review</button>
+      <button type="button" class="btn-cancel" id="btn-cancel-modal">Cancel</button>
+    </form>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script>
+/* ============================================================
+   STATIC PLACEHOLDER DATA
+   Engineer: replace with GET /api/gyms
+   day_of_week: 0=Mon … 6=Sun (ISO 8601)
+   fee_cents: null=unknown, 0=free, 2000=$20
+   ============================================================ */
+const gymData = [
+  {
+    id: 1,
+    name: "Austin Kung Fu & BJJ",
+    address: "7023 Brodie Ln, Austin, TX",
+    lat: 30.2141, lng: -97.8389,
+    visitor_policy: "welcome",
+    website_url: "https://example.com/austinkungfu",
+    instagram: "https://instagram.com/austinkungfu",
+    openMats: [
+      {
+        day_of_week: 5,
+        start_time: "11:00", end_time: "13:00",
+        format: "both", fee_cents: 0, min_belt: null,
+        notes: "All levels, visitors always welcome.",
+        last_verified_at: "2026-11-15", verified_by: "owner",
+        freshnessClass: "fresh", freshnessLabel: "Verified 2 days ago by owner"
+      }
+    ]
+  },
+  {
+    id: 2,
+    name: "Gracie Barra South Austin",
+    address: "4600 S Lamar Blvd, Austin, TX",
+    lat: 30.2374, lng: -97.7955,
+    visitor_policy: "call_first",
+    website_url: "https://example.com/gbsouth",
+    instagram: "https://instagram.com/gbsouth",
+    openMats: [
+      {
+        day_of_week: 5,
+        start_time: "10:00", end_time: "11:30",
+        format: "gi", fee_cents: 2000, min_belt: "white",
+        notes: "Call ahead to confirm. Drop-in $20.",
+        last_verified_at: "2026-11-01", verified_by: "visitor",
+        freshnessClass: "fresh", freshnessLabel: "Verified 16 days ago by visitor"
+      },
+      {
+        day_of_week: 0,
+        start_time: "19:00", end_time: "20:30",
+        format: "gi", fee_cents: 2000, min_belt: "white",
+        notes: null,
+        last_verified_at: "2026-11-01", verified_by: "visitor",
+        freshnessClass: "fresh", freshnessLabel: "Verified 16 days ago by visitor"
+      }
+    ]
+  },
+  {
+    id: 3,
+    name: "Neon Dojo",
+    address: "2300 E Cesar Chavez St, Austin, TX",
+    lat: 30.2588, lng: -97.7116,
+    visitor_policy: "welcome",
+    website_url: null,
+    instagram: "https://instagram.com/neondojo",
+    openMats: [
+      {
+        day_of_week: 6,
+        start_time: "09:00", end_time: "11:00",
+        format: "nogi", fee_cents: 0, min_belt: null,
+        notes: "Garage gym. No-gi only. Very chill.",
+        last_verified_at: "2026-08-10", verified_by: "visitor",
+        freshnessClass: "stale", freshnessLabel: "Last seen 3 months ago"
+      }
+    ]
+  },
+  {
+    id: 4,
+    name: "Relson Gracie Austin",
+    address: "1601 E Oltorf St, Austin, TX",
+    lat: 30.2283, lng: -97.7336,
+    visitor_policy: "welcome",
+    website_url: "https://example.com/relsonaustin",
+    instagram: null,
+    openMats: [
+      {
+        day_of_week: 5,
+        start_time: "12:00", end_time: "14:00",
+        format: "gi", fee_cents: 1500, min_belt: "blue",
+        notes: "Blue belt minimum for open mat. $15 drop-in.",
+        last_verified_at: "2026-10-20", verified_by: "agent_check",
+        freshnessClass: "warn", freshnessLabel: "Last checked 28 days ago"
+      },
+      {
+        day_of_week: 2,
+        start_time: "19:30", end_time: "21:00",
+        format: "gi", fee_cents: 1500, min_belt: "blue",
+        notes: "Blue belt minimum.",
+        last_verified_at: "2026-10-20", verified_by: "agent_check",
+        freshnessClass: "warn", freshnessLabel: "Last checked 28 days ago"
+      }
+    ]
+  },
+  {
+    id: 5,
+    name: "10th Planet Austin",
+    address: "3416 Far West Blvd, Austin, TX",
+    lat: 30.3395, lng: -97.7724,
+    visitor_policy: "welcome",
+    website_url: "https://example.com/10paustin",
+    instagram: "https://instagram.com/10paustin",
+    openMats: [
+      {
+        day_of_week: 5,
+        start_time: "14:00", end_time: "16:00",
+        format: "nogi", fee_cents: 0, min_belt: null,
+        notes: "No-gi only. All levels welcome.",
+        last_verified_at: "2026-11-10", verified_by: "owner",
+        freshnessClass: "fresh", freshnessLabel: "Verified 7 days ago by owner"
+      }
+    ]
+  }
+];
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAY_FULL  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+function formatTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "pm" : "am";
+  const h12  = hour % 12 === 0 ? 12 : hour % 12;
+  return m === "00" ? `${h12}${ampm}` : `${h12}:${m}${ampm}`;
+}
+
+function formatFee(cents) {
+  if (cents === null || cents === undefined) return "Fee unknown";
+  if (cents === 0) return "Free";
+  return `$${cents / 100}`;
+}
+function feeClass(cents) { return cents === 0 ? "free" : ""; }
+
+function policyLabel(p) {
+  if (p === "welcome")      return { label: "Visitors welcome",       cls: "policy-welcome" };
+  if (p === "call_first")   return { label: "Call ahead",             cls: "policy-call"    };
+  if (p === "members_only") return { label: "Members only",           cls: "policy-members" };
+  return                           { label: "Policy unknown",         cls: "policy-unknown" };
+}
+function policyBannerLabel(p) {
+  if (p === "welcome")      return { label: "Visitors are welcome — just show up.", cls: "welcome" };
+  if (p === "call_first")   return { label: "Call ahead before dropping in.",       cls: "call"    };
+  if (p === "members_only") return { label: "Members only. Contact the gym.",       cls: "members" };
+  return                           { label: "Visitor policy not confirmed.",        cls: "call"    };
+}
+
+/* ============================================================
+   FILTER STATE
+   filterState.days: Set of active day indices (0=Mon…6=Sun)
+   Empty set = all days shown.
+   ============================================================ */
+const filterState = {
+  days:   new Set([5]),  // default: Saturday
+  format: null,
+  free:   false
+};
+
+/* Return first mat that falls on any selected day (sorted by day index).
+   If no days selected, return the gym's first scheduled mat. */
+function getMatchingMat(gym) {
+  if (filterState.days.size === 0) {
+    return [...gym.openMats].sort((a, b) => a.day_of_week - b.day_of_week)[0] || null;
+  }
+  return [...gym.openMats]
+    .sort((a, b) => a.day_of_week - b.day_of_week)
+    .find(m => filterState.days.has(m.day_of_week)) || null;
+}
+
+function getFilteredGyms() {
+  return gymData.filter(gym => {
+    const mat = getMatchingMat(gym);
+    if (!mat) return false;
+    if (filterState.format && mat.format !== filterState.format) return false;
+    if (filterState.free && mat.fee_cents !== 0) return false;
+    return true;
+  });
+}
+
+/* ============================================================
+   GYM CARD TEMPLATE
+   ============================================================ */
+function gymCardHTML(gym, mat) {
+  const timeStr = `${formatTime(mat.start_time)}${mat.end_time ? "–" + formatTime(mat.end_time) : ""}`;
+  const dayName = DAY_FULL[mat.day_of_week];
+  const formatLabel = mat.format === "both" ? "Gi &amp; No-Gi" : mat.format === "nogi" ? "No-Gi" : "Gi";
+  return `
+    <article class="gym-card" role="listitem" tabindex="0" data-gym-id="${gym.id}"
+      aria-label="${gym.name}, open mat ${dayName} ${timeStr}">
+      <div class="card-top">
+        <div class="gym-name">${gym.name}</div>
+        <!-- FRESHNESS BADGE — trust differentiator -->
+        <div class="freshness-badge ${mat.freshnessClass}" aria-label="${mat.freshnessLabel}">
+          <div class="freshness-dot" aria-hidden="true"></div>
+          ${mat.freshnessClass === "fresh" ? "Fresh" : mat.freshnessClass === "warn" ? "Aging" : "Stale"}
+        </div>
+      </div>
+      <div class="card-meta">
+        <span class="card-day">${dayName}</span>
+        <span class="card-time">${timeStr}</span>
+        <span class="format-badge ${mat.format}">${formatLabel}</span>
+        <span class="card-fee ${feeClass(mat.fee_cents)}">${formatFee(mat.fee_cents)}</span>
+      </div>
+      <div class="card-footer">
+        <div class="card-verified-line" aria-label="Verification info">${mat.freshnessLabel}</div>
+        <button class="btn-see-details" data-gym-id="${gym.id}" aria-label="See details for ${gym.name}">
+          Details →
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+/* ============================================================
+   RENDER GYM LIST
+   ============================================================ */
+function renderGymList() {
+  const list     = document.getElementById("gym-list");
+  const countEl  = document.getElementById("result-count");
+  const emptyEl  = document.getElementById("empty-state");
+  const filtered = getFilteredGyms();
+
+  list.querySelectorAll(".gym-card").forEach(el => el.remove());
+
+  if (filtered.length === 0) {
+    emptyEl.classList.add("visible");
+    countEl.textContent = "No results";
+    return;
+  }
+
+  emptyEl.classList.remove("visible");
+
+  const days = [...filterState.days].sort();
+  let dayLabel = "";
+  if (filterState.days.size === 1)      dayLabel = ` ${DAY_FULL[days[0]]}`;
+  else if (filterState.days.size > 1)   dayLabel = " · multiple days";
+
+  countEl.textContent = `${filtered.length} result${filtered.length !== 1 ? "s" : ""}${dayLabel}`;
+
+  filtered.forEach(gym => {
+    const mat = getMatchingMat(gym);
+    list.insertAdjacentHTML("beforeend", gymCardHTML(gym, mat));
+  });
+
+  list.querySelectorAll(".gym-card, .btn-see-details").forEach(el => {
+    el.addEventListener("click", e => {
+      showDetail(parseInt(el.getAttribute("data-gym-id"), 10));
+      e.stopPropagation();
+    });
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        showDetail(parseInt(el.getAttribute("data-gym-id"), 10));
+        e.preventDefault();
+      }
+    });
+  });
+}
+
+/* ============================================================
+   MAP — Leaflet + OpenStreetMap
+   Engineer: OSM attribution rendered by Leaflet automatically — do not remove.
+   TODO: add Leaflet.markercluster when coverage grows beyond Austin.
+   ============================================================ */
+const map = L.map("map", { center: [30.2672, -97.7431], zoom: 12, zoomControl: true });
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+/* Triangle-pin marker icon — downward-pointing triangle with circle at tip.
+   Colors keyed to belt palette freshness signal. */
+function makeMarkerIcon(freshnessClass) {
+  const colors = {
+    fresh:   "#1E4D8C",   // blue belt
+    warn:    "#5C3317",   // brown belt
+    stale:   "#7A6060",   // desaturated
+    default: "#6B2D8B"    // purple belt
+  };
+  const c = colors[freshnessClass] || colors.default;
+  const svg =
+    `<svg width="24" height="30" xmlns="http://www.w3.org/2000/svg">` +
+    `<polygon points="12,26 2,4 22,4" fill="${c}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>` +
+    `<circle cx="12" cy="26" r="3" fill="white"/>` +
+    `<circle cx="12" cy="26" r="1.5" fill="${c}"/>` +
+    `</svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize:   [24, 30],
+    iconAnchor: [12, 29],
+    popupAnchor:[0, -30]
+  });
+}
+
+const markers = {};
+
+function buildPopupHTML(gym, mat) {
+  const timeStr = mat
+    ? `${formatTime(mat.start_time)}${mat.end_time ? "–" + formatTime(mat.end_time) : ""}`
+    : "No session today";
+  const formatLabel = mat
+    ? (mat.format === "both" ? "Gi &amp; No-Gi" : mat.format === "nogi" ? "No-Gi" : "Gi")
+    : "";
+  return `
+    <div class="map-popup">
+      <div class="map-popup-name">${gym.name}</div>
+      ${mat ? `
+        <div class="map-popup-row">
+          <strong>${DAY_FULL[mat.day_of_week]}</strong> ${timeStr}
+        </div>
+        <div class="map-popup-row">
+          <span class="format-badge ${mat.format}" style="font-size:11px;">${formatLabel}</span>
+          <span class="card-fee ${feeClass(mat.fee_cents)}" style="font-size:13px;">${formatFee(mat.fee_cents)}</span>
+        </div>
+        <div class="map-popup-freshness">
+          <span class="freshness-badge ${mat.freshnessClass}">
+            <div class="freshness-dot" aria-hidden="true"></div>
+            ${mat.freshnessLabel}
+          </span>
+        </div>
+      ` : `<div class="map-popup-row" style="color:var(--color-text-muted)">No open mat on this day.</div>`}
+      <a class="map-popup-link" href="#" data-gym-id="${gym.id}" role="button">See full schedule →</a>
+    </div>
+  `;
+}
+
+function renderMarkers() {
+  Object.values(markers).forEach(m => map.removeLayer(m));
+
+  gymData.forEach(gym => {
+    const mat = getMatchingMat(gym);
+    const freshness = mat ? mat.freshnessClass : "default";
+    const marker = L.marker([gym.lat, gym.lng], {
+      icon: makeMarkerIcon(freshness),
+      title: gym.name,
+      alt: gym.name
+    });
+
+    marker.bindPopup(buildPopupHTML(gym, mat), { maxWidth: 260 });
+
+    marker.on("popupopen", () => {
+      setTimeout(() => {
+        const link = document.querySelector(`.leaflet-popup [data-gym-id="${gym.id}"]`);
+        if (link) {
+          link.addEventListener("click", e => {
+            e.preventDefault();
+            showDetail(gym.id);
+            marker.closePopup();
+          });
+        }
+      }, 50);
+    });
+
+    marker.addTo(map);
+    markers[gym.id] = marker;
+  });
+}
+
+/* ============================================================
+   DETAIL DRAWER
+   ============================================================ */
+function showDetail(gymId) {
+  const gym = gymData.find(g => g.id === gymId);
+  if (!gym) return;
+
+  document.getElementById("drawer-name").textContent = gym.name;
+
+  const scheduleRows = gym.openMats.map(mat => {
+    const timeStr = `${formatTime(mat.start_time)}${mat.end_time ? " – " + formatTime(mat.end_time) : ""}`;
+    const fmtLabel = mat.format === "both" ? "Gi &amp; No-Gi" : mat.format === "nogi" ? "No-Gi" : "Gi";
+    return `
+      <div class="schedule-row">
+        <div class="schedule-day">${DAY_NAMES[mat.day_of_week]}</div>
+        <div>
+          <div class="schedule-time">${timeStr}
+            <span class="format-badge ${mat.format}" style="margin-left:6px;font-size:10px;">${fmtLabel}</span>
+          </div>
+          ${mat.notes    ? `<div class="schedule-note">${mat.notes}</div>` : ""}
+          ${mat.min_belt ? `<div class="schedule-note">Min belt: ${mat.min_belt}</div>` : ""}
+        </div>
+        <div class="schedule-fee ${feeClass(mat.fee_cents)}">${formatFee(mat.fee_cents)}</div>
+      </div>
+    `;
+  }).join("");
+
+  const bestMat = gym.openMats.reduce((a, b) =>
+    new Date(a.last_verified_at) > new Date(b.last_verified_at) ? a : b
+  );
+
+  const contactLinks = [
+    gym.website_url ? `<a class="contact-link" href="${gym.website_url}" target="_blank" rel="noopener" aria-label="Website for ${gym.name}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+      Website</a>` : "",
+    gym.instagram ? `<a class="contact-link" href="${gym.instagram}" target="_blank" rel="noopener" aria-label="Instagram for ${gym.name}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+      Instagram</a>` : ""
+  ].filter(Boolean).join("");
+
+  document.getElementById("drawer-body").innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Open mat schedule</div>
+      ${scheduleRows}
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">Data freshness</div>
+      <div class="drawer-freshness ${bestMat.freshnessClass}" role="status">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        ${bestMat.freshnessLabel}
+      </div>
+    </div>
+
+    ${contactLinks ? `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Contact</div>
+      <div class="contact-links">${contactLinks}</div>
+    </div>` : ""}
+
+    <div class="drawer-section">
+      <div class="drawer-section-label">Help keep this accurate</div>
+      <!-- "Report outdated info" reuses the submit form — same code path -->
+      <button class="btn-report" aria-label="Report outdated info for ${gym.name}" id="btn-report-${gym.id}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Report outdated info
+      </button>
+    </div>
+  `;
+
+  document.getElementById("detail-overlay").classList.add("open");
+  document.getElementById("detail-overlay").setAttribute("aria-hidden", "false");
+  document.getElementById("detail-drawer").classList.add("open");
+  document.getElementById("detail-drawer").setAttribute("aria-hidden", "false");
+  document.getElementById("btn-close-drawer").focus();
+
+  const reportBtn = document.getElementById(`btn-report-${gymId}`);
+  if (reportBtn) reportBtn.addEventListener("click", openModal);
+}
+
+function closeDetail() {
+  document.getElementById("detail-overlay").classList.remove("open");
+  document.getElementById("detail-overlay").setAttribute("aria-hidden", "true");
+  document.getElementById("detail-drawer").classList.remove("open");
+  document.getElementById("detail-drawer").setAttribute("aria-hidden", "true");
+}
+
+document.getElementById("detail-overlay").addEventListener("click", closeDetail);
+document.getElementById("btn-close-drawer").addEventListener("click", closeDetail);
+
+/* ============================================================
+   SUBMIT / REPORT MODAL
+   ============================================================ */
+function openModal() {
+  document.getElementById("modal-overlay").classList.add("open");
+  document.getElementById("modal-overlay").setAttribute("aria-hidden", "false");
+  document.getElementById("f-name").focus();
+}
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("open");
+  document.getElementById("modal-overlay").setAttribute("aria-hidden", "true");
+}
+
+document.getElementById("btn-fab").addEventListener("click", openModal);
+document.getElementById("btn-cancel-modal").addEventListener("click", closeModal);
+document.getElementById("modal-overlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("modal-overlay")) closeModal();
+});
+
+document.getElementById("submit-form").addEventListener("submit", e => {
+  e.preventDefault();
+  document.getElementById("modal").innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 24px;text-align:center;">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="28,4 52,48 4,48" fill="none" stroke="#6B2D8B" stroke-width="2.5" stroke-linejoin="round"/>
+        <polyline points="20,30 26,36 36,22" stroke="#5B9BD5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="font-size:18px;font-weight:700;">Thanks! Submitted for review.</div>
+      <div style="font-size:14px;color:var(--color-text-muted);max-width:260px;">
+        We'll verify the info and add it to the map. Usually within 24–48 hours.
+      </div>
+      <button class="btn-submit" style="max-width:200px;" onclick="closeModal()">Done</button>
+    </div>
+  `;
+});
+
+/* ============================================================
+   FILTER CHIP INTERACTIONS
+   ============================================================ */
+function setActiveChip(chip, isActive) {
+  chip.setAttribute("aria-pressed", isActive.toString());
+  chip.classList.toggle("active", isActive);
+}
+
+// Day chips — multi-select (Mon–Sun)
+document.querySelectorAll(".day-chip").forEach(chip => {
+  chip.addEventListener("click", function() {
+    const day = parseInt(this.getAttribute("data-day"), 10);
+    if (filterState.days.has(day)) {
+      filterState.days.delete(day);
+      setActiveChip(this, false);
+    } else {
+      filterState.days.add(day);
+      setActiveChip(this, true);
+    }
+    renderGymList();
+    renderMarkers();
+  });
+});
+
+// Format chips
+["gi","nogi","both"].forEach(fmt => {
+  document.getElementById(`chip-${fmt}`).addEventListener("click", function() {
+    const isActive = filterState.format === fmt;
+    filterState.format = isActive ? null : fmt;
+    ["gi","nogi","both"].forEach(f =>
+      setActiveChip(document.getElementById(`chip-${f}`), filterState.format === f)
+    );
+    renderGymList();
+    renderMarkers();
+  });
+});
+
+document.getElementById("chip-free").addEventListener("click", function() {
+  filterState.free = !filterState.free;
+  setActiveChip(this, filterState.free);
+  renderGymList();
+  renderMarkers();
+});
+
+// Clear all filters — resets days to empty (show all)
+document.getElementById("btn-clear-filters").addEventListener("click", () => {
+  filterState.days   = new Set();
+  filterState.format = null;
+  filterState.free   = false;
+  document.querySelectorAll(".day-chip").forEach(c => setActiveChip(c, false));
+  ["gi","nogi","both","free"].forEach(f =>
+    setActiveChip(document.getElementById(`chip-${f}`), false)
+  );
+  renderGymList();
+  renderMarkers();
+});
+
+/* ============================================================
+   BOTTOM SHEET SWIPE-TO-SNAP GESTURE
+   Three snap states: peek (80px visible), half (45%), full (92%).
+   Tracks touch and mouse drag; snaps on release using position + velocity.
+   Desktop: transform overridden to none by @media CSS — gestures idle.
+   ============================================================ */
+const sheet = document.getElementById("bottom-sheet");
+let sheetState    = "half";
+let isDragging    = false;
+let dragMoved     = false;    // true if pointer moved enough to be a drag (not a tap)
+let dragStartY    = 0;
+let dragBaseY     = 0;        // translateY at drag start
+let currentY      = 0;        // live translateY during drag
+let lastEventY    = 0;
+let lastEventTime = 0;
+let velocity      = 0;
+
+function getSnapY(state) {
+  const h = sheet.offsetHeight;
+  if (state === "peek") return h - 80;
+  if (state === "half") return Math.round(h * 0.55);
+  if (state === "full") return Math.round(h * 0.08);
+  return Math.round(h * 0.55);
+}
+
+function snapToState(state, animate) {
+  sheetState = state;
+  currentY   = getSnapY(state);
+  sheet.style.transition = animate ? "transform 0.25s ease" : "none";
+  sheet.style.transform  = `translateY(${currentY}px)`;
+}
+
+function getNearestState(y) {
+  const dists = ["peek","half","full"].map(s => ({ s, d: Math.abs(y - getSnapY(s)) }));
+  return dists.sort((a, b) => a.d - b.d)[0].s;
+}
+
+function startDrag(clientY) {
+  isDragging = true;
+  dragMoved  = false;
+  dragStartY = clientY;
+  dragBaseY  = currentY;
+  lastEventY = clientY;
+  lastEventTime = Date.now();
+  velocity = 0;
+  sheet.style.transition = "none";
+}
+
+function moveDrag(clientY) {
+  if (!isDragging) return;
+  if (Math.abs(clientY - dragStartY) > 4) dragMoved = true;
+  const now = Date.now();
+  const dt  = now - lastEventTime || 1;
+  velocity  = (clientY - lastEventY) / dt;
+  lastEventY = clientY;
+  lastEventTime = now;
+  const h    = sheet.offsetHeight;
+  const minY = getSnapY("full");
+  const maxY = getSnapY("peek");
+  currentY   = Math.max(minY, Math.min(maxY, dragBaseY + (clientY - dragStartY)));
+  sheet.style.transform = `translateY(${currentY}px)`;
+}
+
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  // Fast swipe overrides nearest-position logic
+  const states = ["full","half","peek"];
+  const idx = states.indexOf(sheetState);
+  let target;
+  if (velocity > 0.5 && idx < 2)       target = states[idx + 1]; // swipe down
+  else if (velocity < -0.5 && idx > 0) target = states[idx - 1]; // swipe up
+  else                                  target = getNearestState(currentY);
+  snapToState(target, true);
+}
+
+// Touch events (passive where possible)
+document.getElementById("sheet-handle").addEventListener("touchstart", e => {
+  startDrag(e.touches[0].clientY);
+}, { passive: true });
+document.addEventListener("touchmove", e => {
+  if (isDragging) moveDrag(e.touches[0].clientY);
+}, { passive: true });
+document.addEventListener("touchend", () => endDrag());
+
+// Mouse events (desktop testing)
+document.getElementById("sheet-handle").addEventListener("mousedown", e => {
+  e.preventDefault();
+  startDrag(e.clientY);
+});
+document.addEventListener("mousemove", e => { if (isDragging) moveDrag(e.clientY); });
+document.addEventListener("mouseup",   () => endDrag());
+
+// Tap (no drag) cycles through states: peek → half → full → peek
+document.getElementById("sheet-handle").addEventListener("click", () => {
+  if (dragMoved) return;
+  const cycle = { peek: "half", half: "full", full: "peek" };
+  snapToState(cycle[sheetState], true);
+});
+
+/* ============================================================
+   ESCAPE KEY
+   ============================================================ */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (document.getElementById("modal-overlay").classList.contains("open")) closeModal();
+    else if (document.getElementById("detail-drawer").classList.contains("open")) closeDetail();
+  }
+});
+
+/* ============================================================
+   INITIAL RENDER
+   ============================================================ */
+renderGymList();
+renderMarkers();
+// Set initial sheet position after layout (transform approach requires offsetHeight)
+requestAnimationFrame(() => snapToState("half", false));
+</script>
+
+</body>
+</html>

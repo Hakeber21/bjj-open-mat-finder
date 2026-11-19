@@ -127,6 +127,35 @@ The goal is to hand building to agents and keep me as **product owner and review
 - Keep a running **decision log** in `docs/decisions/` (what, why, alternatives rejected). It feeds the PR agent's case study.
 - Small steps and visible progress. If blocked or ambiguous, ask rather than guess on anything irreversible.
 
+### Visual identity (for the designer agent)
+Two gradients, both supplied by the builder. The HSL values are the source of truth.
+
+**1. Belt gradient (the product's BJJ identity).** Runs through the belt colors: white, blue, purple, brown, black.
+```css
+/* fallback solid color first, then the gradient */
+background: hsla(220, 55%, 68%, 1);
+background: linear-gradient(
+  90deg,
+  hsla(220, 55%, 68%, 1) 0%,    /* white belt — periwinkle, reads as lightest stop; shifted from pure pale-gray for legibility of white text */
+  hsla(228, 92%, 47%, 1) 14%,   /* blue belt   (about #0A36E8) */
+  hsla(272, 94%, 49%, 1) 35%,   /* purple belt */
+  hsla(27, 53%, 25%, 1) 58%,    /* brown belt  */
+  hsla(20, 79%, 7%, 1) 81%      /* black belt  */
+);
+```
+
+**2. hirebekah gradient (the builder's personal brand).** From `#43BECA` to `rebeccapurple` (`#663399`).
+```css
+background: hsla(185, 56%, 53%, 1);
+background: linear-gradient(90deg, hsla(185, 56%, 53%, 1) 0%, hsla(270, 50%, 40%, 1) 100%);
+```
+
+Notes for the designer:
+- The builder's tool exported older vendor-prefixed versions (`-moz-`, `-webkit-`) and an IE `filter`. Modern browsers don't need them, so use the standard `linear-gradient` above with the solid fallback.
+- The belt gradient goes from very light to near black, so **no single text color works on top of it**. Use it as an accent (borders, header strips, dividers, progress bars), not as a background behind text, unless the text sits on a solid panel. Check contrast on anything placed near it.
+- Don't rely on belt color alone to carry meaning (for example a minimum-belt badge). Always pair color with a text label.
+- Roles: the belt gradient is the product's signature element; the hirebekah gradient is the builder credit ("Built by Rebekah" in the footer, linking back to the portfolio site).
+
 ## 10. Milestones
 1. **Foundations:** repo, agent definitions, schema, seed data for Austin, a basic API query.
 2. **Core search:** map and list, filters, gym detail page.
