@@ -40,6 +40,14 @@ jobs:
             git fetch --quiet origin main
             git reset --hard origin/main
             /opt/openmat/venv/bin/pip install -q -r requirements.txt
+            # Publish the static frontend into nginx's webroot so the site is
+            # updated on every deploy. index.html uses API_BASE="" (same-origin),
+            # so its /api/* calls are served by this same app. The webroot is
+            # owned by the deploy user, so no sudo is needed. Excludes keep the
+            # dev mockup and Certbot's ACME challenge dir out of the mirror.
+            rsync -a --delete \
+              --exclude='mockup.html' --exclude='.well-known/' \
+              frontend/ /var/www/openmat.hirebekah.com/
             # Write the env file from the secret (0600 via umask), then restart.
             umask 077
             printf "DATABASE_URL_UNPOOLED='%s'\n" "$DBURL" > /opt/openmat/openmat.env
